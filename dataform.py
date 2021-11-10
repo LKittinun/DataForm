@@ -1,9 +1,14 @@
 import PySimpleGUI as sg
 import pandas as pd
 import numpy as np
-from datetime import date
+import os
 import sys
 import logging
+from datetime import date
+from pathlib import Path
+
+path = Path(__file__).parent.absolute()
+os.chdir(path)
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',\
     datefmt='%d-%b-%y %H:%M:%S', level=logging.INFO, \
@@ -52,10 +57,18 @@ def main():
         layout3.append([sg.Text(f'{variable}', size = (8,1)), \
             sg.InputText(size = (20,1), key = f'{variable}')])
 
-    layout = [[sg.Column(layout1), sg.Column(layout2), sg.Column(layout3)],
-    [sg.Button('First'), sg.Button('Previous'), sg.Button('Next'), sg.Button('Last')], 
-    [sg.Button('Update'), sg.Button('Clear')],
-    [sg.FileSaveAs('Save file', enable_events=True, file_types=(('xlsx', '*.xlsx'), ('csv', '.csv')),\
+    whole_column = [[sg.Column(layout1,vertical_alignment='top'), \
+        sg.Column(layout2,vertical_alignment='top'),\
+             sg.Column(layout3,vertical_alignment='top')]]
+
+    layout = [[sg.Column(whole_column, size = (800,520), scrollable=True, vertical_scroll_only=True)],
+    [sg.Stretch(),sg.Button(image_filename = './pic/ButtonGraphics/First.png', key='_First_'), \
+        sg.Button(image_filename = './pic/ButtonGraphics/Previous.png', key = '_Previous_'), \
+            sg.Button(image_filename = './pic/ButtonGraphics/Next2.png', key='_Next_'), \
+                sg.Button(image_filename = './pic/ButtonGraphics/Last.png', key='_Last_'),\
+                    sg.Stretch()], 
+    [sg.Button('Update'), sg.Button('Clear'), sg.Stretch(),
+    sg.FileSaveAs('Save file', enable_events=True, file_types=(('xlsx', '*.xlsx'), ('csv', '.csv')),\
         default_extension='.xlsx', key = '_FILE_', initial_folder=_folder), \
             sg.Button('Show DF'), sg.Button('History')]]
 
@@ -147,20 +160,17 @@ def main():
                 show_error()
 
         if event == 'History':
-                # with open('DataAPP/history.log', 'r+') as h:
-                #     for line in h:
-                #         sg.Print(line)
                 open_history()
     
-        if event == 'First':
+        if event == '_First_':
             df_tmp = df.iloc[[0]]
             get_variable(df_tmp)
 
-        if event == 'Last':
+        if event == '_Last_':
             df_tmp = df.iloc[[-1]]
             get_variable(df_tmp)
 
-        if event == 'Next':
+        if event == '_Next_':
             try:
                 if (int(values['index'])+2) > df.shape[0]:
                     df_tmp = df.iloc[[0]]
@@ -170,7 +180,7 @@ def main():
             except:
                 show_error()
 
-        if event == 'Previous':
+        if event == '_Previous_':
             try:
                 df_tmp = df.iloc[[(int(values['index'])-1)]]
                 get_variable(df_tmp)    
@@ -192,11 +202,14 @@ def main():
         if event == sg.WINDOW_CLOSE_ATTEMPTED_EVENT:
             answer = sg.popup_ok_cancel('Are you sure?\nPlease save the file.')
             if answer == 'OK':
-                with open('DataAPP/history.log', 'a') as h:
-                    h.write(f'{date.today()}: {values["index"]}\n')
+                if values['index'] != '-1':
+                    with open('history.log', 'a') as h:
+                        h.write(f'{date.today()}: {values["index"]}\n')
                 break
             else:
                 continue
+    
+    print('Close the program...')
 
     window.close()
 
@@ -216,7 +229,7 @@ def open_df(df):
 def open_history():
     
     text = ''
-    with open('DataAPP/history.log', 'r+') as h:
+    with open('history.log', 'r+') as h:
         for line in h:
             text += line
 
@@ -234,12 +247,12 @@ def open_history():
         if event == 'Clear':
             answer = sg.PopupOKCancel('Clear history?')
             if answer == 'OK':
-                h = open('DataAPP/history.log', 'r+')
+                h = open('history.log', 'r+')
                 h.truncate(0)
                 h.close()
                 text = ''
                 break
-                
+            
     window.close()
 
 if __name__ == '__main__':
