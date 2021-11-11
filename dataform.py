@@ -62,7 +62,7 @@ def main():
     sg.Button(image_filename = './pic/ButtonGraphics/First.png', key='_First_', tooltip='First record'), \
     sg.Button(image_filename = './pic/ButtonGraphics/Previous.png', key = '_Previous_', tooltip='Previous record'), \
     sg.Button(image_filename = './pic/ButtonGraphics/New.png', key = '_New_',tooltip='New record'),\
-    sg.Button(image_filename = './pic/ButtonGraphics/Next2.png', key='_Next_', tooltip='Next record'), \
+    sg.Button(image_filename = './pic/ButtonGraphics/Next2.png', key='_Next_', tooltip='Next record'),\
     sg.Button(image_filename = './pic/ButtonGraphics/Last.png', key='_Last_', tooltip='Last record'),\
     sg.Stretch()], 
     [sg.Button('Update', tooltip = 'Update data in the form', button_color='green'), \
@@ -112,6 +112,7 @@ def main():
             except:
                 show_error()
                 return
+        
             old_value = df.loc[df['hn'] == int(values['hn'])].to_dict()
             new_value = {key: values[key] for key in all_col}
             
@@ -136,11 +137,11 @@ def main():
                     df = df.append(new_df[all_col], ignore_index=True)
                 else:
                     df.loc[df['hn'] == int(values['hn'])] = new_df[all_col].values[0]
-                save_file(f'temp.{_extension}', df) 
+                save_file(f'backup/temp.{_extension}', df) 
                 return(df)
             else:
                 return(df)
-        except :
+        except:
            show_error()
     
     def delete_row(df):
@@ -148,8 +149,10 @@ def main():
         if answer == 'OK':
             answer2 = sg.popup_ok_cancel('Sure?')
             if answer2 == 'OK':
+                save_file(f'backup/temp_before_delete.{_extension}', df)
                 df = df.drop(int(values['index'])).reset_index(drop=True)
                 get_variable(df.iloc[[int(values['index'])]])
+                save_file(f'backup/temp.{_extension}', df)
             return(df)
         else:
             return(df)
