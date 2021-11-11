@@ -7,15 +7,8 @@ import logging
 from datetime import date
 from pathlib import Path
 
-path = Path(__file__).parent.absolute()
-os.chdir(path)
-
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',\
-    datefmt='%d-%b-%y %H:%M:%S', level=logging.INFO, \
-        handlers=[logging.FileHandler(filename='app.log', mode='a',  encoding='utf-8')])
-
 def main():
-
+    
     sg.theme('Darkteal6')
 
     _path = r'C:/Users/Kittinun/Desktop/R Workspace/CCRT/test.xlsx'
@@ -32,12 +25,14 @@ def main():
     object_col = [x for x in df.select_dtypes('object').columns]
     date_col = [x for x in df.select_dtypes('datetime').columns]
 
-    #* Change to date-only format, dont known why cannot use apply to all columns
+    #? Change to date-only format, dont known why cannot use apply to all columns
     for col in date_col:
         df[f'{col}'] = df[f'{col}'].apply( lambda x: x.date())
 
+    #* ==== Layout =====
+
     layout1 = [[sg.Text('Numeric column', font=('Arial', 10, 'bold'))],
-    [sg.Text('index', size = (5,1)), sg.InputText('-1', size = (4,1), key = 'index'),\
+    [sg.Text('index', size = (5,1)), sg.InputText(size = (4,1), key = 'index'),\
         sg.Button('Get index', pad = (47,0))],
     [sg.Text('hn', size = (3,1)), sg.InputText(size = (8,1), key = 'hn', pad = (20,0)), sg.Button('Get HN')]]
 
@@ -78,7 +73,9 @@ def main():
         sg.Input(key = '_FILESAVE_', visible=False,enable_events=True),\
             sg.Button('Show DF', tooltip = 'Show source dataframe'),\
                  sg.Button('History', tooltip = 'History of last records before close')]]
- 
+    
+    #* ==== Function =====
+
     def clear_input():
         for key in values:
             if key in ['index','hn','Save as']:
@@ -87,19 +84,17 @@ def main():
                 window[key]('')
         return None
 
+    def show_error():
+        sg.PopupError(f'''- Type: {sys.exc_info()[0]}\n- Details: {sys.exc_info()[1]}''')
+        logging.error("Exception occurred", exc_info=True)
+
     def get_variable(df):
         window['index'](df.index[0])
         for variable in numeric_col + object_col + date_col:
             window[f'{variable}'](df[f'{variable}'].iloc[0])
 
-    def show_error():
-        sg.PopupError(f'''- Type: {sys.exc_info()[0]}\n- Details: {sys.exc_info()[1]}''')
-        logging.error("Exception occurred", exc_info=True)
-
     def save_file(filename, df):
-        print(filename)
         extension = filename.split('.')[-1]
-        print(extension)
         if extension == 'xlsx':
             df.to_excel(filename, index=False)
         if extension == 'csv':
@@ -159,8 +154,10 @@ def main():
         else:
             return(df)
 
+    #* ==== Start application here =====
+
     window = sg.Window(f'Data entry form {_path}', layout, element_justification='l', grab_anywhere=True,\
-         enable_close_attempted_event=True)
+         enable_close_attempted_event=True, alpha_channel=0.97,finalize=True)
 
     while True:             
 
@@ -195,7 +192,9 @@ def main():
 
         if event == '_Next_':
             try:
-                if (int(values['index'])+2) > df.shape[0]:
+                if (values['index']) == '':
+                    df_tmp = df.iloc[[0]]
+                elif (int(values['index'])+2) > df.shape[0]:
                     df_tmp = df.iloc[[0]]
                 else: 
                     df_tmp = df.iloc[[(int(values['index'])+1)]]
@@ -205,7 +204,10 @@ def main():
 
         if event == '_Previous_':
             try:
-                df_tmp = df.iloc[[(int(values['index'])-1)]]
+                if (values['index']) == '':
+                    df_tmp = df.iloc[[-1]]
+                else:
+                    df_tmp = df.iloc[[(int(values['index'])-1)]]
                 get_variable(df_tmp)    
             except:
                 show_error()
@@ -231,13 +233,14 @@ def main():
             save_file(values['_FILESAVE_'], df)
        
         if event == sg.WINDOW_CLOSE_ATTEMPTED_EVENT:
-            answer = sg.popup_ok_cancel('Are you sure?\nPlease save the file.')
-            if answer == 'OK':
-                if values['index'] != '-1':
-                    with open('history.log', 'a') as h:
-                        h.write(f'{date.today()}: {values["index"]}\n')
-                break
-            else:
+            choice = before_close(values, _path, _folder)
+            if choice[0] == 'exit':
+                if choice[1] is None:
+                    break
+                else:
+                    save_file(choice[1], df)
+                    break
+            if choice[0] == 'continue':
                 continue
 
     print('Close the program...')
@@ -246,6 +249,10 @@ def main():
 
 def open_df(df):
     
+    """
+    This function create a dataframe from main df output
+    """
+    
     header_list = [x for x in df.columns] 
 
     layout = [[sg.Table(df.values.tolist(), headings=header_list, auto_size_columns=False,\
@@ -253,18 +260,20 @@ def open_df(df):
 
     window = sg.Window('Dataframe', layout, modal=True, size=(800,400))
 
-    window.read()
+    window.read(close=True)
     
-    window.close()
-
 def open_history():
     
+    """
+    This function prints histories of last file + index opened before closed
+    """
+
     text = ''
     with open('history.log', 'r+') as h:
         for line in h:
             text += line
 
-    layout = [[sg.Multiline(text, size = (50,10), key = '_output_')],
+    layout = [[sg.Multiline(text, size = (80,10), key = '_output_')],
     [sg.Button('Clear'), sg.Button('Exit')]]
     
     window = sg.Window('History', layout, modal = True)
@@ -286,5 +295,44 @@ def open_history():
             
     window.close()
 
+def before_close(main_values, main_path, folder):
+
+    """
+    This function create pop-up with save as output
+    main_values = values from main()
+    """
+
+    layout = [[sg.Text('Save before exit?')],\
+        [sg.FileSaveAs(button_text='Yes', file_types=(('xlsx','.xlsx'),('csv','.csv')), \
+        default_extension='.xlsx',initial_folder = folder, target='_SAVEEXIT_', s=5),\
+            sg.Input(key = '_SAVEEXIT_', visible=False, enable_events=True),\
+                 sg.No(s=5), sg.Cancel(s=5)]]
+    
+    event, values = sg.Window('Exit confirmation', layout, modal=True, \
+        disable_minimize=True, disable_close=True).read(close=True)
+
+    if event == '_SAVEEXIT_':
+        if main_values['index'] != '':
+            with open('history.log', 'a') as h:
+                h.write(f'{date.today()}, {main_path}, {main_values["index"]}\n')
+        return(['exit', values['_SAVEEXIT_']])
+
+    if event == 'No':
+        if main_values['index'] != '':
+            with open('history.log', 'a') as h:
+                h.write(f'{date.today()}, {main_path}, {main_values["index"]}\n')
+        return(['exit', None])
+    if event == 'Cancel':
+        return(['continue'])
+    if event is None:
+        return(['continue'])
+
 if __name__ == '__main__':
+    path = Path(__file__).parent.absolute()
+    os.chdir(path)
+
+    logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',\
+    datefmt='%d-%b-%y %H:%M:%S', level=logging.INFO, \
+        handlers=[logging.FileHandler(filename='app.log', mode='a',  encoding='utf-8')])
+
     main()
