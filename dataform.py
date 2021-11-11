@@ -16,11 +16,12 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 
 def main():
 
-    sg.theme('DarkBlue 14')
+    sg.theme('Darkteal6')
 
     _path = r'C:/Users/Kittinun/Desktop/R Workspace/CCRT/test.xlsx'
     _folder = '/'.join(_path.split('/')[:-1])
-    
+    _extension = _path.split('.')[-1]
+
     df = pd.read_excel(_path)
 
     print('Form launched...')
@@ -62,20 +63,25 @@ def main():
              sg.Column(layout3,vertical_alignment='top')]]
 
     layout = [[sg.Column(whole_column, size = (800,520), scrollable=True, vertical_scroll_only=True)],
-    [sg.Stretch(),sg.Button(image_filename = './pic/ButtonGraphics/First.png', key='_First_'), \
-        sg.Button(image_filename = './pic/ButtonGraphics/Previous.png', key = '_Previous_'), \
-            sg.Button(image_filename = './pic/ButtonGraphics/Next2.png', key='_Next_'), \
-                sg.Button(image_filename = './pic/ButtonGraphics/Last.png', key='_Last_'),\
-                    sg.Stretch()], 
-    [sg.Button('Update'), sg.Button('Clear'), sg.Stretch(),
-    sg.FileSaveAs('Save file', enable_events=True, file_types=(('xlsx', '*.xlsx'), ('csv', '.csv')),\
-        default_extension='.xlsx', key = '_FILE_', initial_folder=_folder), \
-            sg.Button('Show DF'), sg.Button('History')]]
-
-
+    [sg.Stretch(),\
+    sg.Button(image_filename = './pic/ButtonGraphics/First.png', key='_First_', tooltip='First record'), \
+    sg.Button(image_filename = './pic/ButtonGraphics/Previous.png', key = '_Previous_', tooltip='Previous record'), \
+    sg.Button(image_filename = './pic/ButtonGraphics/New.png', key = '_New_',tooltip='New record'),\
+    sg.Button(image_filename = './pic/ButtonGraphics/Next2.png', key='_Next_', tooltip='Next record'), \
+    sg.Button(image_filename = './pic/ButtonGraphics/Last.png', key='_Last_', tooltip='Last record'),\
+    sg.Stretch()], 
+    [sg.Button('Update', tooltip = 'Update data in the form', button_color='green'), \
+    sg.Button('Delete', tooltip = 'DELETE THIS INDEX',button_color='red'),\
+    sg.Button('Clear', tooltip = 'Clear output'),\
+    sg.Stretch(),\
+    sg.FileSaveAs(button_text='Save as', file_types=(('xlsx','.xlsx'),('csv','.csv')), default_extension='.xlsx',initial_folder = _folder,target='_FILESAVE_'),\
+        sg.Input(key = '_FILESAVE_', visible=False,enable_events=True),\
+            sg.Button('Show DF', tooltip = 'Show source dataframe'),\
+                 sg.Button('History', tooltip = 'History of last records before close')]]
+ 
     def clear_input():
         for key in values:
-            if key in ['index','hn','_FILE_']:
+            if key in ['index','hn','Save as']:
                 continue
             else: 
                 window[key]('')
@@ -90,8 +96,7 @@ def main():
         sg.PopupError(f'''- Type: {sys.exc_info()[0]}\n- Details: {sys.exc_info()[1]}''')
         logging.error("Exception occurred", exc_info=True)
 
-    def save_file():
-        filename = values['_FILE_']
+    def save_file(filename, df):
         print(filename)
         extension = filename.split('.')[-1]
         print(extension)
@@ -106,6 +111,7 @@ def main():
             new_df = new_df.apply(lambda x: x.str.strip()).replace(['NaN', 'nan', 'None', ''], np.NaN)
             try:
                 new_df[numeric_col] = new_df[numeric_col].astype('float')
+                new_df['hn'] = new_df['hn'].astype('int')
                 for col in date_col:
                     new_df[f'{col}'] = new_df[f'{col}'].apply(lambda x: pd.to_datetime(x).date())
             except:
@@ -113,6 +119,7 @@ def main():
                 return
             old_value = df.loc[df['hn'] == int(values['hn'])].to_dict()
             new_value = {key: values[key] for key in all_col}
+            
             answer = sg.popup_ok_cancel(f'''
 
             Confirm data? 
@@ -130,21 +137,37 @@ def main():
             ''')
 
             if answer == 'OK':
-                df.loc[df['hn'] == int(values['hn'])] = new_df[all_col].values[0]
+                if len(df.loc[df['hn'] == int(values['hn'])]) == 0:
+                    df = df.append(new_df[all_col], ignore_index=True)
+                else:
+                    df.loc[df['hn'] == int(values['hn'])] = new_df[all_col].values[0]
+                save_file(f'temp.{_extension}', df) 
+                return(df)
+            else:
+                return(df)
         except :
            show_error()
+    
+    def delete_row(df):
+        answer = sg.popup_ok_cancel('Delete this index?')
+        if answer == 'OK':
+            answer2 = sg.popup_ok_cancel('Sure?')
+            if answer2 == 'OK':
+                df = df.drop(int(values['index'])).reset_index(drop=True)
+                get_variable(df.iloc[[int(values['index'])]])
+            return(df)
+        else:
+            return(df)
 
     window = sg.Window(f'Data entry form {_path}', layout, element_justification='l', grab_anywhere=True,\
          enable_close_attempted_event=True)
-
-
 
     while True:             
 
         event, values = window.read()
 
         logging.info(f'event: {event}\nvalues: {values}')
-
+             
         if event == 'Get HN':
             try:        
                 df_tmp = df.loc[df['hn'] == int(values['hn'])]
@@ -186,9 +209,17 @@ def main():
                 get_variable(df_tmp)    
             except:
                 show_error()
+        
+        if event == '_New_':
+            window['index'](len(df))
+            window['hn']('')
+            clear_input()
+
+        if event == 'Delete':
+            df = delete_row(df)
 
         if event == 'Update':
-            update_value(df)
+            df = update_value(df)
 
         if event == 'Clear':
             clear_input()
@@ -196,8 +227,8 @@ def main():
         if event == 'Show DF':
             open_df(df)
 
-        if event == '_FILE_':
-            save_file()
+        if event == '_FILESAVE_':
+            save_file(values['_FILESAVE_'], df)
        
         if event == sg.WINDOW_CLOSE_ATTEMPTED_EVENT:
             answer = sg.popup_ok_cancel('Are you sure?\nPlease save the file.')
@@ -208,7 +239,7 @@ def main():
                 break
             else:
                 continue
-    
+
     print('Close the program...')
 
     window.close()
@@ -218,9 +249,9 @@ def open_df(df):
     header_list = [x for x in df.columns] 
 
     layout = [[sg.Table(df.values.tolist(), headings=header_list, auto_size_columns=False,\
-        vertical_scroll_only = False, num_rows=20,display_row_numbers=True)]]
+        vertical_scroll_only=False, num_rows=20, display_row_numbers=True)]]
 
-    window = sg.Window('Dataframe', layout, modal=True, size=(800,500))
+    window = sg.Window('Dataframe', layout, modal=True, size=(800,400))
 
     window.read()
     
