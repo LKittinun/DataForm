@@ -2,4 +2,4 @@ app.log
 history.log
 tutorial
 backup/*
-!backup/.gitignore
+!backup/hidden.txt
