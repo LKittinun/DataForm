@@ -9,9 +9,9 @@ from pathlib import Path
 
 class error_handler:
 
-    '''
+    """[summary]
     Provide accessible error function for all panels.
-    '''
+    """
 
     def show_error(self):
         sg.PopupError(f'''- Type: {sys.exc_info()[0]}\n- Details: {sys.exc_info()[1]}''')
@@ -19,13 +19,16 @@ class error_handler:
 
 def main():
 
-    '''
+    """[summary]
     First page, choose file
-    '''
+    """
 
     sg.theme('Darkteal6')
 
-    layout = [[sg.Text('File '), sg.InputText(key='_FILEPATH_', s=30), sg.FileBrowse('Browse', target = '_FILEPATH_')],\
+    with open('history.log', 'r') as h:
+        lastdata = h.readlines()[-1].split(', ')[1]
+
+    layout = [[sg.Text('File '), sg.InputText(f'{lastdata}', key='_FILEPATH_', s=40), sg.FileBrowse('Browse', target = '_FILEPATH_')],\
         [sg.Text('Skip'), sg.InputText('0', s=3, key='_ROWSKIP_')],
         [sg.OK(s=10)]]
 
@@ -142,16 +145,19 @@ def homepage(_path, rowskip):
     def update_value(df):        
         try:
             new_df = pd.DataFrame(values, index = [0])
+            if 'hn' not in df.columns:
+                new_df.drop('hn', axis=1, inplace=True)
             new_df = new_df.apply(lambda x: x.str.strip()).replace(['NaN', 'nan', 'None', ''], np.NaN)
             try:
                 new_df[numeric_col] = new_df[numeric_col].astype('float')
-                new_df['hn'] = new_df['hn'].astype('int')
+                if 'hn' in new_df.columns:
+                    new_df['hn'] = new_df['hn'].astype('int')
                 for col in date_col:
                     new_df[f'{col}'] = new_df[f'{col}'].apply(lambda x: pd.to_datetime(x).date())
             except:
                 error_func.show_error()
         
-            old_value = df.loc[df['hn'] == int(values['hn'])].to_dict()
+            old_value = df.iloc[int(values['index']):int(values['index'])].to_dict()
             new_value = {key: values[key] for key in all_col}
             
             answer = sg.popup_ok_cancel(f'''
@@ -171,10 +177,10 @@ def homepage(_path, rowskip):
             ''')
 
             if answer == 'OK':
-                if len(df.loc[df['hn'] == int(values['hn'])]) == 0:
+                if len(df.iloc[int(values['index']):int(values['index'])]) == 0:
                     df = df.append(new_df[all_col], ignore_index=True)
                 else:
-                    df.loc[df['hn'] == int(values['hn'])] = new_df[all_col].values[0]
+                    df.iloc[int(values['index']):int(values['index'])] = new_df[all_col].values[0]
                 save_file(f'backup/temp.{_extension}', df) 
                 return(df)
             else:
@@ -190,7 +196,15 @@ def homepage(_path, rowskip):
             if answer2 == 'OK':
                 save_file(f'backup/temp_before_delete.{_extension}', df)
                 df = df.drop(int(values['index'])).reset_index(drop=True)
-                get_variable(df.iloc[[int(values['index'])]])
+
+                #? Re-evaluate form
+                if df.shape[0] == 0:
+                    clear_input()
+                elif int(values['index'])+1 > df.shape[0]:
+                    get_variable(df.iloc[[0]])
+                else:
+                    get_variable(df.iloc[[int(values['index'])]])
+
                 save_file(f'backup/temp.{_extension}', df)
             return(df)
         else:
