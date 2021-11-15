@@ -8,10 +8,26 @@ from datetime import date
 from pathlib import Path
 
 def main():
-    
     sg.theme('Darkteal6')
 
-    _path = r'C:/Users/Kittinun/Desktop/R Workspace/CCRT/test.xlsx'
+    layout = [[sg.InputText(key='_FILEPATH_'), sg.FileBrowse('Browse', target = '_FILEPATH_')],\
+        [sg.OK(s=10)]]
+
+    window = sg.Window('Dataform entry', layout)
+
+    while True:
+        event, values = window.read() 
+        
+        if event == 'OK':
+            homepage(values['_FILEPATH_'])
+            break
+        if event is None:
+            break
+    
+    window.close()
+
+def homepage(_path):
+    
     _folder = '/'.join(_path.split('/')[:-1])
     _extension = _path.split('.')[-1]
 
