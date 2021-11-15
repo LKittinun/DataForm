@@ -7,10 +7,26 @@ import logging
 from datetime import date
 from pathlib import Path
 
+class error_handler:
+
+    '''
+    Provide accessible error function for all panels.
+    '''
+
+    def show_error(self):
+        sg.PopupError(f'''- Type: {sys.exc_info()[0]}\n- Details: {sys.exc_info()[1]}''')
+        logging.error("Exception occurred", exc_info=True)
+
 def main():
+
+    '''
+    First page, choose file
+    '''
+
     sg.theme('Darkteal6')
 
-    layout = [[sg.InputText(key='_FILEPATH_'), sg.FileBrowse('Browse', target = '_FILEPATH_')],\
+    layout = [[sg.Text('File '), sg.InputText(key='_FILEPATH_', s=30), sg.FileBrowse('Browse', target = '_FILEPATH_')],\
+        [sg.Text('Skip'), sg.InputText('0', s=3, key='_ROWSKIP_')],
         [sg.OK(s=10)]]
 
     window = sg.Window('Dataform entry', layout)
@@ -19,19 +35,26 @@ def main():
         event, values = window.read() 
         
         if event == 'OK':
-            homepage(values['_FILEPATH_'])
-            break
+            try:
+                homepage(values['_FILEPATH_'], int(values['_ROWSKIP_']))
+                break
+            except:
+                error_func.show_error()
         if event is None:
             break
     
     window.close()
 
-def homepage(_path):
+def homepage(_path, rowskip):
+    
+    '''
+    Main page for data entry
+    '''
     
     _folder = '/'.join(_path.split('/')[:-1])
     _extension = _path.split('.')[-1]
 
-    df = pd.read_excel(_path)
+    df = pd.read_excel(_path, dtype={'hn':'int'}, skiprows=rowskip)
 
     print('Form launched...')
     print(f'Read data from {_path}')
@@ -43,7 +66,7 @@ def homepage(_path):
 
     #? Change to date-only format, dont known why cannot use apply to all columns
     for col in date_col:
-        df[f'{col}'] = df[f'{col}'].apply( lambda x: x.date())
+        df[f'{col}'] = df[f'{col}'].apply(lambda x: x.date())
 
     #* ==== Layout =====
 
@@ -100,9 +123,9 @@ def homepage(_path):
                 window[key]('')
         return None
 
-    def show_error():
-        sg.PopupError(f'''- Type: {sys.exc_info()[0]}\n- Details: {sys.exc_info()[1]}''')
-        logging.error("Exception occurred", exc_info=True)
+    # def show_error():
+    #     sg.PopupError(f'''- Type: {sys.exc_info()[0]}\n- Details: {sys.exc_info()[1]}''')
+    #     logging.error("Exception occurred", exc_info=True)
 
     def get_variable(df):
         window['index'](df.index[0])
@@ -126,8 +149,7 @@ def homepage(_path):
                 for col in date_col:
                     new_df[f'{col}'] = new_df[f'{col}'].apply(lambda x: pd.to_datetime(x).date())
             except:
-                show_error()
-                return
+                error_func.show_error()
         
             old_value = df.loc[df['hn'] == int(values['hn'])].to_dict()
             new_value = {key: values[key] for key in all_col}
@@ -158,7 +180,8 @@ def homepage(_path):
             else:
                 return(df)
         except:
-           show_error()
+           error_func.show_error()
+           return(df)
     
     def delete_row(df):
         answer = sg.popup_ok_cancel('Delete this index?')
@@ -189,14 +212,11 @@ def homepage(_path):
                 df_tmp = df.loc[df['hn'] == int(values['hn'])]
                 get_variable(df_tmp)
             except:
-                show_error()
+                error_func.show_error()
 
-        if event == 'Get index':
-            try:        
-                df_tmp = df.iloc[[int(values['index'])]]
-                get_variable(df_tmp)
-            except:
-                show_error()
+        if event == 'Get index':     
+            df_tmp = df.iloc[[int(values['index'])]]
+            get_variable(df_tmp)
 
         if event == 'History':
                 open_history()
@@ -219,7 +239,7 @@ def homepage(_path):
                     df_tmp = df.iloc[[(int(values['index'])+1)]]
                 get_variable(df_tmp)    
             except:
-                show_error()
+                error_func.show_error()
 
         if event == '_Previous_':
             try:
@@ -229,7 +249,7 @@ def homepage(_path):
                     df_tmp = df.iloc[[(int(values['index'])-1)]]
                 get_variable(df_tmp)    
             except:
-                show_error()
+                error_func.show_error()
         
         if event == '_New_':
             window['index'](len(df))
@@ -240,7 +260,10 @@ def homepage(_path):
             df = delete_row(df)
 
         if event == 'Update':
-            df = update_value(df)
+            try:
+                df = update_value(df)
+            except:
+                error_func.show_error()
 
         if event == 'Clear':
             clear_input()
@@ -354,4 +377,5 @@ if __name__ == '__main__':
     datefmt='%d-%b-%y %H:%M:%S', level=logging.INFO, \
         handlers=[logging.FileHandler(filename='app.log', mode='a',  encoding='utf-8')])
 
+    error_func = error_handler()
     main()
