@@ -23,7 +23,7 @@ def main():
     First page, choose file
     """
 
-    sg.theme('Darkteal6')
+    sg.theme('Reddit')
 
     with open('history.log', 'r') as h:
         lastdata = h.readlines()[-1].split(', ')[1]
@@ -126,10 +126,6 @@ def homepage(_path, rowskip):
                 window[key]('')
         return None
 
-    # def show_error():
-    #     sg.PopupError(f'''- Type: {sys.exc_info()[0]}\n- Details: {sys.exc_info()[1]}''')
-    #     logging.error("Exception occurred", exc_info=True)
-
     def get_variable(df):
         window['index'](df.index[0])
         for variable in numeric_col + object_col + date_col:
@@ -156,8 +152,9 @@ def homepage(_path, rowskip):
                     new_df[f'{col}'] = new_df[f'{col}'].apply(lambda x: pd.to_datetime(x).date())
             except:
                 error_func.show_error()
-        
-            old_value = df.iloc[int(values['index']):int(values['index'])].to_dict()
+                return(df)
+
+            old_value = df.iloc[int(values['index']):int(values['index'])+1].to_dict()
             new_value = {key: values[key] for key in all_col}
             
             answer = sg.popup_ok_cancel(f'''
@@ -177,10 +174,10 @@ def homepage(_path, rowskip):
             ''')
 
             if answer == 'OK':
-                if len(df.iloc[int(values['index']):int(values['index'])]) == 0:
+                if len(df.iloc[int(values['index']):int(values['index'])+1]) == 0:
                     df = df.append(new_df[all_col], ignore_index=True)
                 else:
-                    df.iloc[int(values['index']):int(values['index'])] = new_df[all_col].values[0]
+                    df.iloc[[int(values['index'])]] = new_df[all_col].values[0]
                 save_file(f'backup/temp.{_extension}', df) 
                 return(df)
             else:
