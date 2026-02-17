@@ -25,8 +25,14 @@ def main():
 
     sg.theme('Reddit')
 
-    with open('history.log', 'r') as h:
-        lastdata = h.readlines()[-1].split(', ')[1]
+    lastdata = ''
+    try:
+        with open('history.log', 'r') as h:
+            lines = h.readlines()
+            if lines:
+                lastdata = lines[-1].split(', ')[1]
+    except (FileNotFoundError, IndexError):
+        pass
 
     layout = [[sg.Text('File '), sg.InputText(f'{lastdata}', key='_FILEPATH_', s=40), sg.FileBrowse('Browse', target = '_FILEPATH_')],\
         [sg.Text('Skip'), sg.InputText('0', s=3, key='_ROWSKIP_')],
@@ -41,7 +47,7 @@ def main():
             try:
                 homepage(values['_FILEPATH_'], int(values['_ROWSKIP_']))
                 break
-            except:
+            except Exception:
                 error_func.show_error()
         if event is None:
             break
@@ -54,10 +60,16 @@ def homepage(_path, rowskip):
     Main page for data entry
     '''
     
-    _folder = '/'.join(_path.split('/')[:-1])
-    _extension = _path.split('.')[-1]
+    _folder = str(Path(_path).parent)
+    _extension = Path(_path).suffix.lstrip('.')
 
-    df = pd.read_excel(_path, dtype={'hn':'int'}, skiprows=rowskip)
+    if _extension == 'csv':
+        df = pd.read_csv(_path, skiprows=rowskip)
+    else:
+        df = pd.read_excel(_path, skiprows=rowskip)
+
+    if 'hn' in df.columns:
+        df['hn'] = df['hn'].astype('int')
 
     print('Form launched...')
     print(f'Read data from {_path}')
@@ -143,14 +155,14 @@ def homepage(_path, rowskip):
             new_df = pd.DataFrame(values, index = [0])
             if 'hn' not in df.columns:
                 new_df.drop('hn', axis=1, inplace=True)
-            new_df = new_df.apply(lambda x: x.str.strip()).replace(['NaN', 'nan', 'None', ''], np.NaN)
+            new_df = new_df.apply(lambda x: x.str.strip() if x.dtype == 'object' else x).replace(['NaN', 'nan', 'None', ''], np.NaN)
             try:
                 new_df[numeric_col] = new_df[numeric_col].astype('float')
                 if 'hn' in new_df.columns:
                     new_df['hn'] = new_df['hn'].astype('int')
                 for col in date_col:
                     new_df[f'{col}'] = new_df[f'{col}'].apply(lambda x: pd.to_datetime(x).date())
-            except:
+            except Exception:
                 error_func.show_error()
                 return(df)
 
@@ -175,14 +187,14 @@ def homepage(_path, rowskip):
 
             if answer == 'OK':
                 if len(df.iloc[int(values['index']):int(values['index'])+1]) == 0:
-                    df = df.append(new_df[all_col], ignore_index=True)
+                    df = pd.concat([df, new_df[all_col]], ignore_index=True)
                 else:
                     df.iloc[[int(values['index'])]] = new_df[all_col].values[0]
                 save_file(f'backup/temp.{_extension}', df) 
                 return(df)
             else:
                 return(df)
-        except:
+        except Exception:
            error_func.show_error()
            return(df)
     
@@ -222,7 +234,7 @@ def homepage(_path, rowskip):
             try:        
                 df_tmp = df.loc[df['hn'] == int(values['hn'])]
                 get_variable(df_tmp)
-            except:
+            except Exception:
                 error_func.show_error()
 
         if event == 'Get index':     
@@ -249,7 +261,7 @@ def homepage(_path, rowskip):
                 else: 
                     df_tmp = df.iloc[[(int(values['index'])+1)]]
                 get_variable(df_tmp)    
-            except:
+            except Exception:
                 error_func.show_error()
 
         if event == '_Previous_':
@@ -259,7 +271,7 @@ def homepage(_path, rowskip):
                 else:
                     df_tmp = df.iloc[[(int(values['index'])-1)]]
                 get_variable(df_tmp)    
-            except:
+            except Exception:
                 error_func.show_error()
         
         if event == '_New_':
@@ -273,7 +285,7 @@ def homepage(_path, rowskip):
         if event == 'Update':
             try:
                 df = update_value(df)
-            except:
+            except Exception:
                 error_func.show_error()
 
         if event == 'Clear':
